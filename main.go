@@ -7,6 +7,7 @@ import (
 	"log"
 	"math/rand"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -114,5 +115,48 @@ func RandRange(min int, max int) int {
 }
 
 func PopulateCreditCards(max int, db *sql.DB) error {
+	firstnames, err := ReadFileToStringArray("lists/firstnames.txt")
+	if err != nil {
+		return fmt.Errorf("failed creating firstnames list | %s", err.Error())
+	}
+	lastnames, err := ReadFileToStringArray("lists/lastnames.txt")
+	if err != nil {
+		return fmt.Errorf("failed creating lastnames list | %s", err.Error())
+	}
+	for i := 0; i < max; i++ {
+		date := RandomDate()
+		number := RandomCardNumber()
+		cvv := RandomCVV()
+
+		if _, err := db.Query(
+			fmt.Sprintf(
+				"insert into wp_credit_card (Number, Expiration, CVV, Name)"+
+					"values ('%s', '%s', '%s', '%s')",
+				number, date, cvv, fmt.Sprintf("%s %s ", strings.ToUpper(Pick(firstnames)), strings.ToUpper(Pick(lastnames))),
+			),
+		); err != nil {
+			fmt.Printf("Failed inserting row | %s\n", err.Error())
+		}
+	}
 	return nil
+}
+
+func RandomDate() string {
+	month := RandRange(1, 12)
+	year := RandRange(20, 30)
+
+	return fmt.Sprintf("%s/%s", fmt.Sprintf("%02d", month), strconv.Itoa(year))
+}
+
+func RandomCardNumber() string {
+	var numbers []string
+	for i := 0; i < 4; i++ {
+		nb := RandRange(0, 9999)
+		numbers = append(numbers, fmt.Sprintf("%04d", nb))
+	}
+	return strings.Join(numbers, "-")
+}
+
+func RandomCVV() string {
+	return fmt.Sprintf("%03d", RandRange(0, 999))
 }
