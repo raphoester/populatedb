@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
+	"regexp"
 	"strings"
 	"time"
 
@@ -51,25 +52,46 @@ func PopulateUsers(max int, db *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("failed creating passwords list | %s", err.Error())
 	}
+	domains, err := ReadFileToStringArray("lists/domains.txt")
+	if err != nil {
+		return fmt.Errorf("failed creating domains list | %s", err.Error())
+	}
 
 	for i := 0; i < max; i++ {
-		firstname := pick(firstnames)
-		lastname := pick(lastnames)
-		city := pick(cities)
-		password := pick(passwords)
+		firstname := strings.ToLower(Pick(firstnames))
+		lastname := Pick(lastnames)
+		city := Pick(cities)
+		password := Pick(passwords)
+		email := fmt.Sprintf("%s@%s", generateAliasName([]string{firstname, lastname, city, password}), Pick(domains))
 
 		if _, err := db.Query(
 			fmt.Sprintf(
 				"insert into wp_client_infos (Nom, Prenom, Adresse, Email, Password)"+
-					"values (%s, %s, %s, %s)",
-				firstname, lastname, city, password,
+					"values ('%s', '%s', '%s', '%s', '%s')",
+				lastname, firstname, city, email, password,
 			),
 		); err != nil {
+			fmt.Printf("%s | %s | %s | %s | %s \n", firstname, lastname, city, email, password)
 			fmt.Printf("Failed inserting row | %s\n", err.Error())
 		}
-
 	}
 	return nil
+}
+
+func generateAliasName(infos []string) string {
+	var aliases []string
+	for _, info := range infos {
+
+		aliases = append(aliases, strings.TrimSpace(DeleteSpecialChars(strings.ToLower(info[:RandRange(0, len(info))]))))
+
+	}
+	rand.Shuffle(len(aliases), func(i, j int) { aliases[i], aliases[j] = aliases[j], aliases[i] })
+	return strings.Join(aliases, "")
+}
+
+func DeleteSpecialChars(target string) string {
+	reg, _ := regexp.Compile("[^a-zA-Z0-9]+")
+	return reg.ReplaceAllString(target, "")
 }
 
 func ReadFileToStringArray(path string) ([]string, error) {
@@ -80,8 +102,15 @@ func ReadFileToStringArray(path string) ([]string, error) {
 	return strings.Split(string(content), "\n"), nil
 }
 
-func pick(in []string) string {
+func Pick(in []string) string {
 	return in[rand.Intn(len(in))]
+}
+
+func RandRange(min int, max int) int {
+	if max == 0 {
+		max = 1
+	}
+	return rand.Intn(max-min) + min
 }
 
 func PopulateCreditCards(max int, db *sql.DB) error {
